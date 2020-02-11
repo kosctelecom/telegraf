@@ -9,6 +9,7 @@ import (
 	"io"
 	"net"
 	"path"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -352,6 +353,13 @@ func (c *CiscoTelemetryGNMI) handleTelemetryField(update *gnmi.Update, tags map[
 	if value != nil {
 		fields[name] = value
 	} else if jsondata != nil {
+		if jsondata[0] == '"' && jsondata[len(jsondata)-1] == '"' {
+			// remove quotes from numeric values only
+			b := jsondata[1 : len(jsondata)-1]
+			if _, err := strconv.Atoi(string(b)); err == nil {
+				jsondata = b
+			}
+		}
 		if err := json.Unmarshal(jsondata, &value); err != nil {
 			c.acc.AddError(fmt.Errorf("failed to parse JSON value: %v", err))
 		} else {
@@ -359,6 +367,7 @@ func (c *CiscoTelemetryGNMI) handleTelemetryField(update *gnmi.Update, tags map[
 			flattener.FullFlattenJSON(name, value, true, true)
 		}
 	}
+	c.Log.Debugf(">> got: path=%s, val=%#v, value=%#v (jsondata=%#v)", path, update.Val.Value, value, jsondata)
 	return aliasPath, fields
 }
 
